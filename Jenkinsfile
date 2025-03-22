@@ -1,8 +1,10 @@
 pipeline {
     agent any
     environment {
-        DOCKER_IMAGE = "ajaykanna/docker-app:latest"  // Change this to your registry; Change your docker hub username.
-        CONTAINER_NAME = "docker-running-app1"
+        BACKEND_IMAGE = "ajaykanna/backend-app:latest"
+        FRONTEND_IMAGE = "ajaykanna/frontend-app:latest"
+        BACKEND_CONTAINER = "backend-container"
+        FRONTEND_CONTAINER = "frontend-container"
         REGISTRY_CREDENTIALS = "docker-ajay"  // Jenkins credentials ID
     }
 
@@ -15,9 +17,15 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build Backend Image') {
             steps {
-                sh 'docker build -t $DOCKER_IMAGE .'
+                sh 'docker build -t $BACKEND_IMAGE ./backend'
+            }
+        }
+
+        stage('Build Frontend Image') {
+            steps {
+                sh 'docker build -t $FRONTEND_IMAGE ./frontend'
             }
         }
 
@@ -29,38 +37,64 @@ pipeline {
             }
         }
 
-        stage('Push to Container Registry') {
+        stage('Push Backend Image') {
             steps {
-                sh 'docker push $DOCKER_IMAGE'
+                sh 'docker push $BACKEND_IMAGE'
             }
         }
 
-        stage('Stop & Remove Existing Container') {
+        stage('Push Frontend Image') {
+            steps {
+                sh 'docker push $FRONTEND_IMAGE'
+            }
+        }
+
+        stage('Stop & Remove Existing Backend Container') {
             steps {
                 script {
                     sh '''
-                    if [ "$(docker ps -aq -f name=$CONTAINER_NAME)" ]; then
-                        docker stop $CONTAINER_NAME || true
-                        docker rm $CONTAINER_NAME || true
+                    if [ "$(docker ps -aq -f name=$BACKEND_CONTAINER)" ]; then
+                        docker stop $BACKEND_CONTAINER || true
+                        docker rm $BACKEND_CONTAINER || true
                     fi
                     '''
                 }
             }
         }
 
-        stage('Run Docker Container') {
+        stage('Stop & Remove Existing Frontend Container') {
             steps {
-                sh 'docker run -d -p 5001:5000 --name $CONTAINER_NAME $DOCKER_IMAGE'
+                script {
+                    sh '''
+                    if [ "$(docker ps -aq -f name=$FRONTEND_CONTAINER)" ]; then
+                        docker stop $FRONTEND_CONTAINER || true
+                        docker rm $FRONTEND_CONTAINER || true
+                    fi
+                    '''
+                }
+            }
+        }
+
+        stage('Run Backend Container') {
+            steps {
+                sh 'docker run -d -p 5001:5000 --name $BACKEND_CONTAINER $BACKEND_IMAGE'
+            }
+        }
+
+        stage('Run Frontend Container') {
+            steps {
+                sh 'docker run -d -p 3000:3000 --name $FRONTEND_CONTAINER $FRONTEND_IMAGE'
             }
         }
     }
 
     post {
         success {
-            echo "Build, push, and container execution successful!"
+            echo "Backend and frontend deployed successfully!"
         }
         failure {
-            echo "Build or container execution failed."
+            echo "Something went wrong."
         }
     }
 }
+
